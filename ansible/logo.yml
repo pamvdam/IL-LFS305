@@ -1,0 +1,38 @@
+---
+- hosts: 40.118.21.200
+
+  tasks:
+   - name: Ping me
+     ping: 
+
+   - name: Install packages
+     become: yes
+     apt: 
+       name: linuxlogo
+       state: latest
+
+   - name: Install packages
+     become: yes
+     apt: 
+       name: figlet
+       state: latest
+
+   - name: Create banner
+     become: yes
+     shell: linuxlogo -a -L 8 > /etc/issue && figlet {{ ansible_hostname }} >> /etc/issue
+
+   - name: Change sshd config to include banner
+     become: yes
+     replace:
+        path: /etc/ssh/sshd_config
+        regexp: '^#Banner.*'
+        replace: 'Banner /etc/issue'
+        backup: yes
+
+   - name: Restart sshd service
+     become: yes
+     service:
+        name: ssh
+        state: restarted
+ 
+    
