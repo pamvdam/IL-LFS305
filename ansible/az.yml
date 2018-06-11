@@ -1,0 +1,80 @@
+- name: Create Azure VM
+  hosts: localhost
+  connection: local
+  tasks:
+  - name: Create VM
+    azure_rm_virtualmachine:
+      resource_group: azrgn02
+      name: azvmn06
+      vm_size: Standard_DS1_v2
+      admin_username: pascal
+      ssh_password_enabled: false
+      ssh_public_keys: 
+        - path: /home/pascal/.ssh/authorized_keys
+          key_data: "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCp/Sf0JkROJ4fOKTZlesEjOclF7hRiQrz2TpA+NEWeAmUjPv/BnWyhUmMNgEZJeKiBDdM/D7CE5NbhwHLZ92aJgoWMXti1mGF84dyl9hHs+vMDCdmaUu6zs50zfI5OeiF9bDdhe39I/1BjL8Pjl/KLKLUWviY+BJisXNCUz0QvIGkrEAM/KfvpNHRF0n5qhEKfabu5CkIjKL3a9/g0i4ZSsbPPSNZRGUhiyeRbg5+GJyiDkpB52nqobPvvvjRtvvCfk9JJca9x22OF9axqrUKWfFLdyGf3pJshBNuMvs5A9WaiaB7hWGqpgISPb9RZUwnI+wJ4vvSwoDyP71l1zpW5 pascal@kvmlpt12"
+      image:
+        offer: CentOS
+        publisher: OpenLogic
+        sku: '7.3'
+        version: latest
+    register: azure_vm
+
+  - name: Add host to inventory
+    add_host:
+      groups: azure_vms
+      hostname: "{{ azure_vm.properties.networkProfile.networkInterfaces[0].properties.ipConfigurations[0].properties.publicIPAddress.name }}"
+      ansible_host: "{{ azure_vm.properties.networkProfile.networkInterfaces[0].properties.ipConfigurations[0].properties.publicIPAddress.properties.ipAddress }}"
+      ansible_user: pascal
+  - name: Register host
+    connection: local
+    shell: ssh-keyscan {{ azure_vm.properties.networkProfile.networkInterfaces[0].properties.ipConfigurations[0].properties.publicIPAddress.properties.ipAddress }}  >> ~/.ssh/known_hosts
+
+- name: Add host to inventory
+  hosts: azure_vms
+  user: pascal
+
+  tasks:
+  - name: Show hostname
+    shell: hostname
+
+  - name: Install domain tooling
+    become: yes
+    yum:
+      name: "{{ item }}"
+      state: latest
+    with_items: 
+      - realmd
+      - krb5-workstation
+      - sssd
+      - sssd-ad
+      - oddjob-mkhomedir
+      - adcli
+      - samba-common-tools
+      - epel-release
+
+  - name: Install banner tools
+    become: yes
+    yum:
+      name: "{{ item }}"
+      state: latest
+    with_items: 
+      - linux_logo
+      - figlet
+
+  - name: Configure banner
+    become: yes
+    shell: linux_logo -L 23 -a > /etc/issue
+
+  - name: Configure server name for banner
+    become: yes
+    shell: figlet "$(hostname)" >> /etc/issue
+
+  - name: Reconfigure sshd
+    become: yes
+    shell: sed -i /etc/ssh/sshd_config -e 's@^#Banner.*@Banner /etc/issue@g'
+
+  - name: Restart sshd service
+    become: yes
+    service:
+      name: sshd
+      state: restarted

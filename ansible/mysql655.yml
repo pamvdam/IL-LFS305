@@ -1,0 +1,127 @@
+---
+- hosts: azure
+  tasks:
+   - name: Add and enable MYSQL55 repo
+     become: yes
+     yum_repository:
+       name: mysql55-community
+       description: MySQL55 community
+       file: mysql55
+       baseurl: http://repo.mysql.com/yum/mysql-5.5-community/el/6/$basearch/
+       gpgcheck: no
+       enabled: yes
+       state: present
+   - name: Disable MYSQL8 repo
+     become: yes
+     yum_repository:
+       name: mysql8-community
+       description: MySQL8 community
+       file: mysql8
+       baseurl: http://repo.mysql.com/yum/mysql-8.0-community/el/6/$basearch/
+       gpgcheck: no
+       enabled: no
+       state: present
+   - name: Cleanups
+     become: yes
+     shell: yum clean all
+   - name: Uninstall 
+     become: yes
+     yum: name={{ item }} state=absent
+     with_items: 
+     - mysql-server
+     - mysql-client
+     - mysql-community-client
+     - mysql-community-server
+     - mysql-community-common
+     - mysql-community-libs
+   - name: Install python selinux
+     become: yes
+     yum: name=libselinux-python state=present
+   - name: Install mysql-community-client
+     become: yes
+     yum: name=mysql state=present
+   - name: Install mysql-server
+     become: yes
+     yum: name=mysql-community-server state=present
+   - name: Create datadir
+     become: yes
+     file: path=/data/mysqldb01 state=directory owner=mysql group=mysql mode=0770 recurse=yes setype=mysqld_db_t
+   - name: Create logdir
+     become: yes
+     file: path=/data/mysqldb01/log state=directory owner=mysql group=mysql mode=0770 recurse=yes setype=mysqld_db_t
+   - name: Start MySQL service
+     become: yes
+     service: name=mysqld state=started
+   - name: Stop MySQL service
+     become: yes
+     service: name=mysqld state=stopped
+   - name: If needed install rsync
+     become: yes
+     yum: name=rsync state=latest
+   - name: Sync database to /data/mysqldb01
+     become: yes
+     shell: '/usr/bin/rsync -av /var/lib/mysql/* /data/mysqldb01' 
+   - name: Change datadir in my.cnf
+     become: yes
+     shell: sed -i 's#datadir=.*#datadir=/data/mysqldb01#g' /etc/my.cnf
+   - name: Change socketdir in my.cnf
+     become: yes
+     shell: sed -i 's#socket=.*#socket=/data/mysqldb01/mysql/mysql.sock#g' /etc/my.cnf
+   - name: Add socketdir client directive in my.cnf
+     become: yes
+     lineinfile: dest=/etc/my.cnf
+                regexp=''
+                insertafter=EOF
+                line='[client]\nsocket=/data/mysqldb01/mysql/mysql.sock\n' 
+   - name: Start MySQL again
+     become: yes
+     service: name=mysqld state=started
+   - name: Install MySQL-Python
+     become: yes
+     yum: name=MySQL-python state=latest
+
+   - name: Generate new root password
+     command: openssl passwd rand
+     register: mysql_new_root_pass
+   - name: Remove anonymous users
+     become: yes
+     mysql_user: name="" state=absent config_file=/etc/my.cnf
+   - name: Remove test database
+     become: yes
+     mysql_db: name=test state=absent config_file=/etc/my.cnf
+   - name: Update mysql root password
+     become: yes
+     mysql_user: name=root host={{item}} password={{mysql_new_root_pass.stdout}} config_file=/etc/my.cnf
+     with_items:
+       - "{{ ansible_hostname }}"
+       - 127.0.0.1
+       - ::1
+       - localhost
+   - name: Output new root password
+     debug: msg="New root password is {{mysql_new_root_pass.stdout}}"
+   - name: Creating mysql sudoers file
+     become: yes
+     template: src=mysql.sudo dest=/etc/sudoers.d/mysql validate='visudo -cf %s' 
+
+   - name: Set ACLs on my.cnf
+     become: yes
+     acl: name=/etc/my.cnf entry="group:mysql:rw-" state=present
+
+   - name: Create mysqladm group
+     become: yes
+     group: name=mysqladm gid=603 state=present
+
+   - name: Add users to group mysqladm
+     become: yes
+     user: name=pascal groups=mysqladm append=yes state=present
+     
+   - name: Disable MYSQL55 repo
+     become: yes
+     yum_repository:
+       name: mysql55-community
+       description: MySQL55 community
+       file: mysql55
+       baseurl: http://repo.mysql.com/yum/mysql-5.5-community/el/6/$basearch/
+       gpgcheck: no
+       enabled: no
+       state: present
