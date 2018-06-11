@@ -1,0 +1,19 @@
+- name: Create Azure VM
+  hosts: localhost
+  connection: local
+  tasks:
+  - name: Create VM
+    azure_rm_virtualmachine:
+      resource_group: azrgn02
+      name: azvmn06
+      vm_size: Standard_DS1_v2
+      admin_username: pascal
+      ssh_password_enabled: false
+      ssh_public_keys: 
+        - path: /home/pascal/.ssh/authorized_keys
+          key_data: "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCp/Sf0JkROJ4fOKTZlesEjOclF7hRiQrz2TpA+NEWeAmUjPv/BnWyhUmMNgEZJeKiBDdM/D7CE5NbhwHLZ92aJgoWMXti1mGF84dyl9hHs+vMDCdmaUu6zs50zfI5OeiF9bDdhe39I/1BjL8Pjl/KLKLUWviY+BJisXNCUz0QvIGkrEAM/KfvpNHRF0n5qhEKfabu5CkIjKL3a9/g0i4ZSsbPPSNZRGUhiyeRbg5+GJyiDkpB52nqobPvvvjRtvvCfk9JJca9x22OF9axqrUKWfFLdyGf3pJshBNuMvs5A9WaiaB7hWGqpgISPb9RZUwnI+wJ4vvSwoDyP71l1zpW5 pascal@kvmlpt12"
+      image:
+        offer: CentOS
+        publisher: OpenLogic
+        sku: '7.3'
+        version: latest

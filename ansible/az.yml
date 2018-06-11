@@ -4,7 +4,7 @@
   tasks:
   - name: Create VM
     azure_rm_virtualmachine:
-      resource_group: azrgn02
+      resource_group: azrgn01
       name: azvmn06
       vm_size: Standard_DS1_v2
       admin_username: pascal
